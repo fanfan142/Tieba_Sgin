@@ -7,9 +7,10 @@ import pretty_errors
 
 class Tieba():
     def __init__(self, BDUSS, STOKEN):
-        self.BDUSS = '****此处替换为百度账号的BDUSS****'
+        self.BDUSS = '****此处替换为百度账号BDUSS****'
         self.STOKEN = STOKEN
         self.success_list = []
+        self.result = {}
         self.sign_list = []
         self.fail_list = []
         self.session = session()
@@ -54,6 +55,7 @@ class Tieba():
             return True
         elif r['error_code'] == '0':
             print(f'"{forum_name}">>>>>>>签到成功，您是第{r["user_info"]["user_sign_rank"]}个签到的用户！') # Modify!
+            self.result[forum_name] = r  # 更新 result 属性
             self.success_list.append(forum_name)
             return True
         else:
@@ -69,10 +71,8 @@ class Tieba():
             flag = self.sign(forum_name)
             if not flag: rest.add(forum_name)
         self.rest = rest
-
         if n >= 10:  # 最大重试次数
             self.rest = set()
-
     def main(self, max):
         self.set_cookie()
         self.fetch_likes()
@@ -90,7 +90,6 @@ class Tieba():
             print('--------- 签到失败列表 ----------')
             for forum_name in self.rest:
                 print(f'"{forum_name}"签到失败！')
-
 #def main_handler(*args):
     #with open('BDUSS.txt') as f: BDUSS = f.read()
     #with open('STOKEN.txt') as f: STOKEN = f.read()
@@ -101,14 +100,12 @@ def send_wechat(msg):
         print('微信推送成功')
     else:
         print('微信推送失败')
-
-
 if __name__ == "__main__":
     
     BDUSS=[""]
     
     STOKEN=''
-    sckey = '****此处替换为Server酱SCKEY****'
+    sckey = '****此处替换为Server酱SCKEY****' 
     for param in BDUSS:
         # 多账号签到
         task = Tieba(param, STOKEN)
@@ -122,7 +119,7 @@ if __name__ == "__main__":
         success_list += f'    {forum}  （签到成功，第{sign_rank}个签到）\n'
     
     # 遍历已经签到的贴吧列表，每个贴吧名称单独一行
-    sign_list = f'\n\n- **已经签到成功的贴吧**：\n\n' + "\n\n".join([f'    {forum}' for forum in task.sign_list])
+    sign_list = f'\n\n- **已经签到的贴吧**：\n\n' + "\n\n".join([f'    {forum}' for forum in task.sign_list])
 
     # 遍历签到失败的贴吧列表，每个贴吧名称单独一行
     fail_list = f'\n\n- **签到失败贴吧**：\n\n' + "\n\n".join([f'    {forum}' for forum in task.fail_list])

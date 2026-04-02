@@ -14,6 +14,9 @@ except ImportError:
 TBS_URL = "http://tieba.baidu.com/dc/common/tbs"
 LIKES_URL = "https://tieba.baidu.com/mo/q/newmoindex?"
 SIGN_URL = "http://c.tieba.baidu.com/c/c/forum/sign"
+SCKEY_PLACEHOLDER = "****此处替换为Server酱SCKEY****"
+BDUSS_PLACEHOLDER = "****此处替换为百度账号BDUSS****"
+ACCOUNT_SEPARATOR = "========================"
 
 
 class Tieba:
@@ -53,8 +56,8 @@ class Tieba:
             raise Exception("获取tbs错误！以下为返回数据：" + str(response))
 
     def fetch_likes(self):
-        self.rest.clear()
-        self.already.clear()
+        self.rest = set()
+        self.already = set()
         response = self.session.get(LIKES_URL).json()
         if response["no"] != 0:
             raise Exception("获取关注贴吧错误！以下为返回数据：" + str(response))
@@ -95,7 +98,7 @@ class Tieba:
                 rest.add(forum_name)
         self.rest = rest
 
-    def run(self, max_retry):
+    def run(self, max_attempts):
         self.set_cookie()
         self.fetch_likes()
         if self.already:
@@ -104,7 +107,7 @@ class Tieba:
                 print(f'"{forum_name}"已签到')
                 self.sign_list.append(forum_name)
         round_index = 0
-        while round_index < max_retry and self.rest:
+        while round_index < max_attempts and self.rest:
             round_index += 1
             self.loop(round_index)
         if self.rest:
@@ -116,7 +119,7 @@ class Tieba:
         success_lines = ["", "- **签到成功贴吧**：", ""]
         for forum in self.success_list:
             sign_rank = self.result[forum]["user_info"]["user_sign_rank"]
-            success_lines.append(f"    {forum}（签到成功，第{sign_rank}个签到）")
+            success_lines.append(f"    {forum} （签到成功，第{sign_rank}个签到）")
 
         fail_lines = ["", "- **签到失败贴吧**：", ""]
         fail_lines.extend([f"    {forum}" for forum in self.fail_list])
@@ -125,7 +128,7 @@ class Tieba:
         signed_lines.extend([f"    {forum}" for forum in self.sign_list])
 
         summary = (
-            f"共关注了{len(self.already) + len(self.rest)}个贴吧，本次成功签到了{len(self.success_list)}个，"
+            f"共关注了{len(self.already) + len(self.success_list) + len(self.fail_list)}个贴吧，本次成功签到了{len(self.success_list)}个，"
             f"失败了{len(self.fail_list)}个，有{len(self.sign_list)}个贴吧已经签到。"
         )
         return "\n".join([summary] + success_lines + fail_lines + signed_lines)
@@ -139,27 +142,47 @@ def parse_bduss_accounts(raw_value):
 
 
 def send_wechat(serverchan_sckey, msg):
-    resp = post(f"https://sc.ftqq.com/{serverchan_sckey}.send", params={"text": "贴吧签到结果", "desp": msg})
-    if resp.status_code == 200:
-        print("微信推送成功")
-    else:
-        print("微信推送失败")
+    try:
+        resp = post(
+            f"https://sc.ftqq.com/{serverchan_sckey}.send",
+            params={"text": "贴吧签到结果", "desp": msg},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            print("微信推送成功")
+        else:
+            print("微信推送失败")
+    except RequestException as exc:
+        print(f"微信推送失败，网络请求异常（含超时）: {exc}")
 
 
 if __name__ == "__main__":
     bduss_accounts = parse_bduss_accounts(os.getenv("TIEBA_BDUSS", ""))
     if not bduss_accounts:
-        bduss_accounts = ["****此处替换为百度账号BDUSS****"]
+        bduss_accounts = [BDUSS_PLACEHOLDER]
+        print("未配置 TIEBA_BDUSS，将使用占位值；请尽快改为真实 BDUSS。")
     stoken = os.getenv("TIEBA_STOKEN", "")
-    sckey = os.getenv("SERVERCHAN_SCKEY", "****此处替换为Server酱SCKEY****")
-    max_retry = int(os.getenv("TIEBA_MAX_RETRY", "3"))
+    sckey = os.getenv("SERVERCHAN_SCKEY", SCKEY_PLACEHOLDER)
+    raw_max_attempts = os.getenv("TIEBA_MAX_RETRY", "3")
+    try:
+        max_attempts = int(raw_max_attempts)
+        if max_attempts <= 0:
+            raise ValueError
+    except ValueError:
+        print(f"TIEBA_MAX_RETRY={raw_max_attempts} 非法（必须为正整数），已回退为默认值 3")
+        max_attempts = 3
 
     reports = []
     for index, bduss in enumerate(bduss_accounts, start=1):
-        print(f"\n======================== 账号{index} ========================\n")
+        print(f"\n{ACCOUNT_SEPARATOR} 账号{index} {ACCOUNT_SEPARATOR}\n")
+        if bduss == BDUSS_PLACEHOLDER:
+            skip_report = f"账号{index}已跳过：请先配置真实 BDUSS。"
+            print(skip_report)
+            reports.append(skip_report)
+            continue
         try:
             task = Tieba(bduss, stoken)
-            task.run(max_retry)
+            task.run(max_attempts)
             reports.append(task.build_report())
         except RequestException as exc:
             error_report = f"账号{index}签到异常：网络请求失败，错误信息：{exc}"
@@ -171,7 +194,7 @@ if __name__ == "__main__":
             reports.append(error_report)
 
     final_report = "\n\n".join(reports)
-    if sckey and "****此处替换为Server酱SCKEY****" not in sckey:
+    if sckey and sckey != SCKEY_PLACEHOLDER:
         send_wechat(sckey, final_report)
 
     print("--------- 本日签到报告 -----------")

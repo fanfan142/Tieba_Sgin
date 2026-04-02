@@ -29,6 +29,7 @@ class Tieba:
         self.fail_list = []
         self.rest = set()
         self.already = set()
+        self.total_forums = 0
         self.tbs = ""
         self.session = session()
         self.session.headers.update(
@@ -49,7 +50,10 @@ class Tieba:
         self.session.cookies.update({"BDUSS": self.BDUSS, "STOKEN": self.STOKEN})
 
     def fetch_tbs(self):
-        response = self.session.get(TBS_URL).json()
+        try:
+            response = self.session.get(TBS_URL).json()
+        except RequestException as exc:
+            raise RequestException(f"获取 tbs 失败：{exc}") from exc
         if response["is_login"] == 1:
             self.tbs = response["tbs"]
         else:
@@ -58,7 +62,10 @@ class Tieba:
     def fetch_likes(self):
         self.rest = set()
         self.already = set()
-        response = self.session.get(LIKES_URL).json()
+        try:
+            response = self.session.get(LIKES_URL).json()
+        except RequestException as exc:
+            raise RequestException(f"获取关注贴吧列表失败：{exc}") from exc
         if response["no"] != 0:
             raise Exception("获取关注贴吧错误！以下为返回数据：" + str(response))
         for forum in response["data"]["like_forum"]:
@@ -66,6 +73,7 @@ class Tieba:
                 self.already.add(forum["forum_name"])
             else:
                 self.rest.add(forum["forum_name"])
+        self.total_forums = len(self.already) + len(self.rest)
 
     def sign(self, forum_name):
         data = {
@@ -128,7 +136,7 @@ class Tieba:
         signed_lines.extend([f"    {forum}" for forum in self.sign_list])
 
         summary = (
-            f"共关注了{len(self.already) + len(self.success_list) + len(self.fail_list)}个贴吧，本次成功签到了{len(self.success_list)}个，"
+            f"共关注了{self.total_forums}个贴吧，本次成功签到了{len(self.success_list)}个，"
             f"失败了{len(self.fail_list)}个，有{len(self.sign_list)}个贴吧已经签到。"
         )
         return "\n".join([summary] + success_lines + fail_lines + signed_lines)
@@ -160,7 +168,7 @@ if __name__ == "__main__":
     bduss_accounts = parse_bduss_accounts(os.getenv("TIEBA_BDUSS", ""))
     if not bduss_accounts:
         bduss_accounts = [BDUSS_PLACEHOLDER]
-        print("未配置 TIEBA_BDUSS，将使用占位值；请尽快改为真实 BDUSS。")
+        print("未配置 TIEBA_BDUSS 环境变量，将使用占位值（仅输出跳过结果，不会执行实际签到）；请配置真实 BDUSS。")
     stoken = os.getenv("TIEBA_STOKEN", "")
     sckey = os.getenv("SERVERCHAN_SCKEY", SCKEY_PLACEHOLDER)
     raw_max_attempts = os.getenv("TIEBA_MAX_RETRY", "3")

@@ -20,7 +20,7 @@
 
 ## 运行环境
 
-- Python 3.8+
+- Python 3.6+
 - 依赖：
   - `requests`
   - `pretty_errors`（可选，缺失不影响功能）
@@ -39,6 +39,7 @@ pip install requests pretty_errors
 
 - `TIEBA_BDUSS`：贴吧账号 `BDUSS`，支持多账号
   - 分隔符支持：`,` / `&` / 换行
+  - 可从浏览器登录百度后，在 Cookie 中获取 `BDUSS` 值
 - `TIEBA_STOKEN`：可选，账号 `STOKEN`
 - `SERVERCHAN_SCKEY`：可选，Server酱 `SCKEY`（配置后才会推送）
 - `TIEBA_MAX_RETRY`：可选，最大重试次数，默认 `3`

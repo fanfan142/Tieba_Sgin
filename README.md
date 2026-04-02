@@ -1,46 +1,86 @@
 # Tieba_Sgin
-一个python脚本，可以实现百度贴吧签到，并通过Serve酱将详细签到结果推送到微信，支持青龙面板运行
-可以使用青龙面板运行，只需要百度账号的BDUSS即可，使用Serve酱需要SendKey
 
-起因是小伙伴从吃灰的收藏夹挖出来一个脚本，原脚本作者是谁已经不知道到是谁了，不过小伙伴在github上挖了挖，这个脚本原来应该是这个项目：https://github.com/PRO-2684/BaiduTieba-Sign
+百度贴吧自动签到脚本，支持：
 
-但是挖出来的脚本文件代码似乎又是别谁修改过的，已经有加上了Serve酱推送。
+- 多账号签到（多 `BDUSS`）
+- 失败重试
+- 推送签到结果到 Server酱（微信）
+- 适配本地 Python 与青龙面板环境变量配置
 
-也就是说，原来脚本已经可以实现签到和消息推送了，但是原脚本推送的消息只会告诉你签到成功了多少个贴吧，失败了多少个，已签到了多少个，并不可以把签到的详细情况通过Serve酱推送。
+---
 
-于是我使用AI和自己做琢磨，对脚本做了一些修改，目的是满足脚本在青龙面板运行，并做了些优化。
+## 功能说明
 
-这里声明一下，我并不程序员，只是个iT从业者，各种东西都只是略懂一丢丢而已。
+- 自动获取关注贴吧列表
+- 区分「已签到 / 新签到成功 / 签到失败」
+- 输出并推送详细签到报告（含签到排名）
+- 可配置最大重试次数，避免无限重试
 
-** 顺便在这里挖个坑：有空的时候研究一下青龙面板的环境变量。将BDUSS等使用环境变量去定义。
+---
 
+## 运行环境
 
-#### 修改后的功能：
+- Python 3.8+
+- 依赖：
+  - `requests`
+  - `pretty_errors`（可选，缺失不影响功能）
 
-1. 使用账号的BDUSS可以进行贴吧签到（废话）
-   
-2. 使用Server酱可以推送签到结果到微信（增加了推送内容，比原有脚本更加详细）
-   
-   （1）添加了签到成功的贴吧、签到失败的贴吧、已经签到的贴吧3个列表
-   
-   （2）签到成功的贴吧列表，添加了是第几个签到的信息
-   
-![图片](https://github.com/yingfeng-i/Tieba_Sgin/assets/18555737/b1491946-b09c-4227-9282-236275056676)
+安装依赖示例：
 
-3. 限制失败重试次数，避免因为某个贴吧一直签到失败陷入死循环。
+```bash
+pip install requests pretty_errors
+```
 
+---
 
+## 配置方式（推荐：环境变量）
 
-#### 青龙面板使用
+脚本支持以下环境变量：
 
-青龙面板使用需要添加 pretty_errors 和 requests 依赖
+- `TIEBA_BDUSS`：贴吧账号 `BDUSS`，支持多账号
+  - 分隔符支持：`,` / `&` / 换行
+- `TIEBA_STOKEN`：可选，账号 `STOKEN`
+- `SERVERCHAN_SCKEY`：可选，Server酱 `SCKEY`（配置后才会推送）
+- `TIEBA_MAX_RETRY`：可选，最大重试次数，默认 `3`
 
-![图片](https://github.com/yingfeng-i/Tieba_Sgin/assets/18555737/a5bacf80-7c73-447a-8c7b-e2205580db17)
+### 多账号示例
 
-脚本的上传和设置任务等这里就不在赘述了，相信你能懂得上github找东西，应该可以搞定
+```bash
+export TIEBA_BDUSS="bduss_a,bduss_b"
+export TIEBA_STOKEN=""
+export SERVERCHAN_SCKEY="SCTxxxxxxxx"
+export TIEBA_MAX_RETRY="3"
+python Tieba_Sgin.py
+```
 
-![图片](https://github.com/yingfeng-i/Tieba_Sgin/assets/18555737/e9d21703-18bb-4c8b-8fa4-7635cae18824)
+---
 
+## 青龙面板示例
 
-定时任务的时间表达语法可以参考我博客的文章
-https://yingfeng.me/archives/648
+在青龙中新增任务前，先安装依赖并设置环境变量：
+
+1. 安装依赖：`requests`（`pretty_errors` 可选）
+2. 配置环境变量：`TIEBA_BDUSS`、`TIEBA_STOKEN`、`SERVERCHAN_SCKEY`、`TIEBA_MAX_RETRY`
+3. 新建定时任务执行 `python Tieba_Sgin.py`
+
+---
+
+## 结果说明
+
+脚本会输出：
+
+- 总贴吧数量
+- 签到成功数量
+- 签到失败数量
+- 已签到数量
+- 详细贴吧列表（成功/失败/已签到）
+
+如已配置 `SERVERCHAN_SCKEY`，同样内容会推送到微信。
+
+---
+
+## 注意事项
+
+- `BDUSS` 属于敏感凭据，请勿提交到仓库。
+- 若不使用环境变量，脚本中仍保留了占位写法，建议仅用于本地临时调试。
+- 百度接口策略可能变动，若失效请结合返回信息排查。
